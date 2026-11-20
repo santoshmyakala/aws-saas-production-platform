@@ -1,0 +1,59 @@
+# main → staging → (approval) → production. Each stage plans, applies the same plan, waits for the ECS
+# canary to finish (or roll back on SLO alarms) and smoke-tests through CloudFront.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    paths: ["terraform/**"]
+  workflow_dispatch:
+    inputs:
+      api_image:
+        description: API image pinned by digest (leave empty to keep the environment's TFVARS value)
+        required: false
+      worker_image:
+        description: Worker image pinned by digest
+        required: false
+
+concurrency:
+  group: deploy # one rollout at a time; never cancel a running apply
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  not-configured:
+    if: vars.DEPLOY_ENABLED != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::notice::Deployments are disabled (repository variable DEPLOY_ENABLED is not 'true'). See docs/ci-cd.md." | tee -a "$GITHUB_STEP_SUMMARY"
+
+  staging:
+    if: vars.DEPLOY_ENABLED == 'true'
+    uses: ./.github/workflows/_terraform.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: staging
+      apply: true
+      api_image: ${{ inputs.api_image || '' }}
+      worker_image: ${{ inputs.worker_image || '' }}
+    secrets:
+      ORIGIN_VERIFY_HEADER: ${{ secrets.ORIGIN_VERIFY_HEADER }}
+
+  production:
+    needs: staging # the production environment requires a reviewer's approval before this job starts
+    uses: ./.github/workflows/_terraform.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: production
+      apply: true
+      api_image: ${{ inputs.api_image || '' }}
+      worker_image: ${{ inputs.worker_image || '' }}
+    secrets:
+      ORIGIN_VERIFY_HEADER: ${{ secrets.ORIGIN_VERIFY_HEADER }}

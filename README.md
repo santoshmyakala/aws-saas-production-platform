@@ -60,6 +60,21 @@ A health check proves a task is up, not that a release is safe. ECS's built-in *
 
 Images are accepted only when pinned by `@sha256` digest, so every rollout and rollback is exact.
 
+## Delivered by GitHub Actions
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/github-actions-dark.svg">
+  <img alt="GitHub Actions flow: a pull request runs ci (format, validate, 18 tests, tflint), Trivy and gitleaks, then a read-only OIDC plan posted as a PR comment; after merge, staging is deployed, production waits for approval and deploys with the same steps; AWS credentials come from STS via OIDC; a nightly drift check opens or closes an issue." src="docs/diagrams/github-actions-light.svg" width="100%">
+</picture>
+
+- **`ci`:** offline tests, lint and scans on every push.
+- **`plan`:** read-only plans for both environments, posted on every PR.
+- **`deploy`:** staging → approval → production. Each stage applies the reviewed plan, waits for the ECS canary (which SLO alarms can roll back) and smoke-tests through CloudFront.
+- **`drift`:** nightly. Raises an issue when someone changes infrastructure outside Terraform.
+- **`diagrams`:** keeps these SVGs in sync with their YAML.
+
+AWS access uses **GitHub OIDC with environment-scoped roles**, so no keys are stored anywhere. A PR can only reach the read-only role. Setup steps and the security model are in [docs/ci-cd.md](docs/ci-cd.md), and [terraform/bootstrap](terraform/bootstrap) creates the OIDC trust, state bucket and roles.
+
 ## Regional disaster recovery
 
 <picture>
@@ -96,6 +111,7 @@ Images are accepted only when pinned by `@sha256` digest, so every rollout and r
 terraform/
   main.tf · edge.tf          global DB, both regions, WAF + CloudFront, Route 53 failover
   modules/region/            one region: VPC, ALB, ECS, Aurora + RDS Proxy, SQS, KMS, IAM, alarms
+  bootstrap/                 GitHub OIDC provider, encrypted state bucket, plan + deploy roles
   tests/ · modules/region/tests/   offline tests (mocked providers)
 docs/
   requirements.md            requirements → constraints, error budget, capacity math
@@ -103,6 +119,8 @@ docs/
   request-path.md            latency budget and timeout per hop
   decisions/                 ADRs: failure domains first, compute, database, deployments, DR
   runbooks/                  AZ failure, regional failover, compromised task role, slow query, DLQ
+  ci-cd.md                   GitHub Actions workflows, OIDC security model, how to enable deploys
+.github/workflows/           ci · plan · deploy · drift · diagrams · _terraform (reusable)
 ```
 
 ## Run it

@@ -1,5 +1,12 @@
 terraform {
   required_version = ">= 1.11" # write-only arguments + ephemeral resources keep the DB password out of state
+
+  # Remote state in S3 with native locking; bucket/key/region come from -backend-config in the
+  # deploy workflows (one key per environment). CI tests run with -backend=false.
+  backend "s3" {
+    use_lockfile = true
+    encrypt      = true
+  }
   required_providers {
     aws = {
       source  = "hashicorp/aws"

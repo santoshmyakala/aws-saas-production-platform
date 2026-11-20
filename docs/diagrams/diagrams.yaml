@@ -122,3 +122,32 @@
     - {from: psec, to: ssec, label: replicated, kind: secure}
     - {from: pdb, to: sdb, label: Aurora Global replication · RPO seconds, kind: async, packet: db, via: [[0, 3.3], [4, 3.3]], at: 0.5}
     - {from: oncall, to: sdb, label: approve, kind: control, at: 0.5}
+
+- out: github-actions
+  title: GitHub Actions — from pull request to production
+  subtitle: Short-lived AWS credentials via OIDC (no stored keys), the reviewed plan is the plan that gets applied, production needs approval
+  grid: {dx: 235, dy: 160}
+  groups:
+    - {id: pr, label: Pull request, icon: github, color: blue, box: [0, 0, 3, 0]}
+    - {id: main, label: Merge to main, icon: githubactions, color: green, box: [0, 1.35, 2, 1.35]}
+  nodes:
+    - {id: dev, label: Developer, sub: opens a PR, icon: user, at: [0, 0], color: gray}
+    - {id: ci, label: ci, sub: fmt · validate · 18 tests · tflint, icon: [terraform, check], at: [1, 0], color: blue}
+    - {id: scan, label: Trivy + gitleaks, sub: IaC + secrets gates, icon: [trivy, key], at: [2, 0], color: green}
+    - {id: plan, label: plan, sub: read-only OIDC role, icon: [githubactions, terraform], at: [3, 0], color: purple}
+    - {id: comment, label: PR comment, sub: staging + production plan, icon: doc, at: [4.35, 0], color: purple}
+    - {id: stg, label: Deploy staging, sub: apply · canary wait · smoke, icon: [terraform, amazonwebservices], at: [0, 1.35], color: green}
+    - {id: gate, label: Approval, sub: production environment, icon: user, at: [1, 1.35], color: red, pulse: true}
+    - {id: prod, label: Deploy production, sub: same steps, digest-pinned, icon: [terraform, amazonwebservices], at: [2, 1.35], color: green}
+    - {id: aws, label: AWS STS, sub: 1 h credentials via OIDC, icon: key, at: [3.2, 1.35], color: orange}
+    - {id: drift, label: Nightly drift check, sub: opens / closes an issue, icon: [scheduler, alert], at: [4.35, 1.35], color: amber}
+  edges:
+    - {from: dev, to: ci, kind: data}
+    - {from: ci, to: scan, kind: data}
+    - {from: scan, to: plan, kind: data}
+    - {from: plan, to: comment, kind: data, packet: doc}
+    - {from: comment, to: stg, label: review + merge, kind: control, via: [[4.35, 0.68], [0, 0.68]], at: 0.5}
+    - {from: stg, to: gate, kind: data}
+    - {from: gate, to: prod, label: approved, kind: secure}
+    - {from: prod, to: aws, label: OIDC, kind: secure, at: 0.5}
+    - {from: drift, to: aws, kind: metrics}

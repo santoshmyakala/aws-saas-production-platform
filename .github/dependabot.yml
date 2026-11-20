@@ -7,7 +7,7 @@ updates:
     cooldown:
       default-days: 7
   - package-ecosystem: terraform
-    directories: ["/terraform", "/terraform/modules/region"]
+    directories: ["/terraform", "/terraform/modules/region", "/terraform/bootstrap"]
     schedule: { interval: weekly }
     open-pull-requests-limit: 5
     cooldown:
