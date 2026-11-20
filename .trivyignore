@@ -1,1 +1,19 @@
-# Accepted Trivy findings. Each entry must carry its justification; CI blocks on anything else.
+# Accepted Trivy findings. Each one is a deliberate design decision; CI blocks on anything else.
+
+# AWS-0053: ALB is internet-facing.
+# CloudFront needs a public origin. The ALB is still unreachable except from CloudFront: its security group
+# admits only the managed prefix list com.amazonaws.global.cloudfront.origin-facing (+ Route 53 health
+# checkers on a static liveness path), and the listener's default action is 403 unless the request carries
+# the shared X-Origin-Verify header. Asserted by test `edge_cannot_be_bypassed`.
+AWS-0053
+
+# AWS-0132: ALB access-log bucket uses SSE-S3 rather than a customer-managed KMS key.
+# Elastic Load Balancing log delivery supports only SSE-S3 (AES256) destinations. The bucket blocks all
+# public access, enforces TLS, and has versioning and lifecycle expiry. All other data uses the platform CMK.
+AWS-0132
+
+# AWS-0104: App tasks may open HTTPS (443 only) to any address.
+# Required for third-party APIs (payment provider, e-mail). Traffic leaves through the zonal NAT gateway;
+# AWS APIs use VPC endpoints instead. To restrict by FQDN, route egress through the inspection VPC with a
+# TLS-SNI allowlist (see cloud-solution-architectures/02-hub-spoke-network).
+AWS-0104
