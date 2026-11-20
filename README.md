@@ -139,10 +139,6 @@ To deploy, fill in `terraform/prod.tfvars.example` with your domain, hosted zone
 
 > **Cost:** running this for real is a production-sized bill. That includes three NAT gateways per region, a 3-instance Aurora cluster, a 2-instance standby and about 27 Fargate tasks. Use `environment = "staging"` and smaller sizes to experiment.
 
-## Credits
-
-The scenario structure (failure domains → accounts → VPC → request path → compute → deployments → data → async → resilience → DR → security → observability) was inspired by a public infographic series by [@veriqta](https://www.instagram.com/veriqta/). The design, code, tests and documents here are my own.
-
 ## Licence
 
 MIT
