@@ -1,0 +1,12 @@
+# Copy to prod.tfvars (git-ignored) and fill in. Images must be pinned by digest.
+domain_name                = "example.com"
+hosted_zone_id             = "Z0123456789ABCDEFGHIJ"
+cloudfront_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/..."
+alb_certificate_arns = {
+  primary = "arn:aws:acm:us-east-1:123456789012:certificate/..."
+  standby = "arn:aws:acm:us-west-2:123456789012:certificate/..."
+}
+api_image            = "123456789012.dkr.ecr.us-east-1.amazonaws.com/docflow-api@sha256:<digest>"
+worker_image         = "123456789012.dkr.ecr.us-east-1.amazonaws.com/docflow-worker@sha256:<digest>"
+otel_collector_image = "public.ecr.aws/aws-observability/aws-otel-collector@sha256:<digest>"
+# origin_verify_header: pass via TF_VAR_origin_verify_header from your secret store, never in a file.

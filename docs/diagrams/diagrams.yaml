@@ -1,0 +1,124 @@
+- out: failure-domains
+  title: Failure-domain map — primary region
+  subtitle: Every AZ is self-sufficient (own NAT, tasks, DB instance); shared components are regional services built for multi-AZ
+  grid: {dx: 215, dy: 140}
+  groups:
+    - {id: vpc, label: VPC 10.10.0.0/16, sub: us-east-1, icon: amazonwebservices, color: orange, box: [0, 1.3, 3, 4.9], pad: 16, pad_top: 6}
+    - {id: aza, label: AZ a, color: blue, box: [0, 2.5, 0, 4.9]}
+    - {id: azb, label: AZ b, color: blue, box: [1, 2.5, 1, 4.9]}
+    - {id: azc, label: AZ c, color: blue, box: [2, 2.5, 2, 4.9]}
+  nodes:
+    - {id: users, label: Customers, sub: browsers · API clients, icon: users, at: [0, 0], color: gray}
+    - {id: r53, label: Route 53, sub: failover origin record, icon: dns, at: [1, 0], color: purple}
+    - {id: cf, label: CloudFront + WAF, sub: TLS · rate limit · OWASP rules, icon: [cdn, shield], at: [2, 0], color: purple}
+    - {id: alb, label: ALB, sub: CloudFront-only · 3 AZs, icon: loadbalancer, at: [1, 1.3], color: blue, pulse: true}
+    - {id: nata, label: NAT gateway, sub: AZ a → internet, icon: gateway, at: [0, 3.7], color: orange}
+    - {id: natb, label: NAT gateway, sub: AZ b → internet, icon: gateway, at: [1, 3.7], color: orange}
+    - {id: natc, label: NAT gateway, sub: AZ c → internet, icon: gateway, at: [2, 3.7], color: orange}
+    - {id: ta, label: ECS tasks, sub: API + worker, icon: [docker, container], at: [0, 2.5], color: blue, stack: true, badge: "8"}
+    - {id: tb, label: ECS tasks, sub: API + worker, icon: [docker, container], at: [1, 2.5], color: blue, stack: true, badge: "8"}
+    - {id: tc, label: ECS tasks, sub: API + worker, icon: [docker, container], at: [2, 2.5], color: blue, stack: true, badge: "8"}
+    - {id: dba, label: Aurora writer, sub: PostgreSQL 16, icon: [postgresql, database], at: [0, 4.9], color: green, pulse: true}
+    - {id: dbb, label: Aurora reader, sub: failover target, icon: [postgresql, database], at: [1, 4.9], color: green}
+    - {id: dbc, label: Aurora reader, sub: failover target, icon: [postgresql, database], at: [2, 4.9], color: green}
+    - {id: vpce, label: VPC endpoints, sub: ECR · logs · SQS · KMS · STS, icon: lock, at: [3, 2.5], color: teal}
+    - {id: proxy, label: RDS Proxy, sub: pooling · TLS · fast failover, icon: switch, at: [3, 3.7], color: green}
+    - {id: sqs, label: SQS + DLQ, sub: jobs · 5 attempts, icon: queue, at: [4.25, 2.5], color: amber}
+    - {id: dr, label: Warm standby, sub: us-west-2 · global DB, icon: [region, backup], at: [4.25, 4.9], color: amber}
+  edges:
+    - {from: users, to: r53, kind: data}
+    - {from: r53, to: cf, kind: data}
+    - {from: cf, to: alb, label: origin header, kind: secure, at: 0.45}
+    - {from: alb, to: ta, kind: data}
+    - {from: alb, to: tb, kind: data}
+    - {from: alb, to: tc, kind: data}
+    - {from: ta, to: nata, kind: control}
+    - {from: tb, to: natb, kind: control}
+    - {from: tc, to: natc, kind: control}
+    - {from: ta, to: natb, label: no cross-AZ egress, kind: deny, at: 0.45}
+    - {from: tc, to: vpce, label: private AWS APIs, kind: secure, at: 0.5}
+    - {from: vpce, to: sqs, kind: async, packet: doc}
+    - {from: tc, to: proxy, kind: data, packet: db}
+    - {from: proxy, to: dba, label: writes, kind: data, via: [[3, 4.33], [0, 4.33]], at: 0.5, packet: db}
+    - {from: dba, to: dbb, kind: async}
+    - {from: dbb, to: dbc, kind: async}
+    - {from: dba, to: dr, label: Aurora Global · ~1 s lag, kind: async, via: [[0, 5.62], [4.25, 5.62]], at: 0.5, packet: db}
+
+- out: request-path
+  title: One request, end to end — with its latency budget
+  subtitle: p99 objective 400 ms. Each hop gets a budget, a timeout and a failure behaviour; slow work leaves the request path via the queue
+  grid: {dx: 230, dy: 165}
+  nodes:
+    - {id: c, label: Client, sub: browser · API, icon: users, at: [0, 0], color: gray}
+    - {id: dns, label: Route 53, sub: cached · ~0 ms warm, icon: dns, at: [1, 0], color: purple}
+    - {id: edge, label: CloudFront + WAF, sub: TLS at the edge · 1–5 ms, icon: [cdn, shield], at: [2, 0], color: purple}
+    - {id: alb, label: ALB, sub: least outstanding · 2–5 ms, icon: loadbalancer, at: [3, 0], color: blue}
+    - {id: api, label: API task, sub: 2 s deadline · admission, icon: [python, container], at: [3, 1], color: blue, pulse: true}
+    - {id: proxy, label: RDS Proxy, sub: borrow ≤ 5 s else fail, icon: switch, at: [2, 1], color: green}
+    - {id: db, label: Aurora, sub: p99 query ≤ 50 ms, icon: [postgresql, database], at: [1, 1], color: green}
+    - {id: q, label: SQS, sub: enqueue ~10 ms, icon: queue, at: [3, 2], color: amber}
+    - {id: w, label: Worker, sub: idempotent · 30 s max, icon: [python, container], at: [2, 2], color: amber}
+    - {id: dlq, label: DLQ, sub: after 5 attempts, icon: queue, at: [1, 2], color: red}
+  edges:
+    - {from: c, to: dns, kind: data}
+    - {from: dns, to: edge, kind: data}
+    - {from: edge, to: alb, label: HTTPS + origin header, kind: secure, at: 0.5}
+    - {from: alb, to: api, kind: data}
+    - {from: api, to: proxy, label: pooled connection, kind: data, packet: db}
+    - {from: proxy, to: db, kind: data, packet: db}
+    - {from: api, to: q, label: 202 Accepted, kind: async, packet: doc}
+    - {from: q, to: w, kind: async, packet: doc}
+    - {from: w, to: dlq, label: poison message, kind: deny}
+
+- out: deployment
+  title: Deployments that cannot take the platform down
+  subtitle: Immutable digests, a 5% canary judged by SLO alarms — not just /healthz — and automatic rollback
+  grid: {dx: 215, dy: 160}
+  nodes:
+    - {id: commit, label: Merge to main, sub: reviewed change, icon: git, at: [0, 0], color: gray}
+    - {id: build, label: Build + test, sub: unit · contract · migration, icon: [githubactions, check], at: [1, 0], color: blue}
+    - {id: sign, label: Scan + sign, sub: Trivy · SBOM · cosign, icon: [trivy, signature], at: [2, 0], color: green}
+    - {id: ecr, label: ECR, sub: "image@sha256 (immutable)", icon: registry, at: [3, 0], color: purple}
+    - {id: tf, label: terraform apply, sub: new digest only, icon: terraform, at: [4, 0], color: purple}
+    - {id: canary, label: Canary 5%, sub: green target group, icon: [container, loadbalancer], at: [4, 1], color: orange, pulse: true}
+    - {id: bake, label: Bake 10 min, sub: 5xx · p99 · DB borrow alarms, icon: [chart, alert], at: [3, 1], color: teal}
+    - {id: full, label: 100% traffic, sub: old revision kept 10 min, icon: check, at: [2, 1], color: green}
+    - {id: rb, label: Automatic rollback, sub: weights back to blue, icon: backup, at: [3, 2], color: red}
+  edges:
+    - {from: commit, to: build, kind: data}
+    - {from: build, to: sign, kind: data, packet: box}
+    - {from: sign, to: ecr, kind: secure, packet: box}
+    - {from: ecr, to: tf, label: digest, kind: data}
+    - {from: tf, to: canary, kind: control}
+    - {from: canary, to: bake, kind: metrics}
+    - {from: bake, to: full, label: alarms quiet, kind: secure}
+    - {from: bake, to: rb, label: any alarm fires, kind: deny}
+
+- out: disaster-recovery
+  title: Regional disaster recovery — warm standby
+  subtitle: RTO 60 min · RPO 15 min. Traffic fails over automatically; promoting the database for writes is an approved decision
+  grid: {dx: 220, dy: 150}
+  groups:
+    - {id: p, label: Primary · us-east-1, icon: region, color: green, box: [0, 1.45, 1, 2.65]}
+    - {id: s, label: Warm standby · us-west-2, icon: region, color: amber, box: [3, 1.45, 4, 2.65]}
+  nodes:
+    - {id: users, label: Customers, sub: app.example.com, icon: users, at: [0, 0], color: gray}
+    - {id: cf, label: CloudFront, sub: origin.example.com, icon: cdn, at: [1, 0], color: purple}
+    - {id: r53, label: Route 53 failover, sub: ALB alive AND capacity OK, icon: dns, at: [2, 0], color: purple, pulse: true}
+    - {id: oncall, label: On-call + approver, sub: runbook decision, icon: user, at: [5.15, 2.65], color: red}
+    - {id: pa, label: ECS + ALB, sub: 24+ tasks, icon: [container, loadbalancer], at: [0, 1.45], color: green, stack: true}
+    - {id: pdb, label: Aurora primary, sub: writer + 2 readers, icon: [postgresql, database], at: [0, 2.65], color: green}
+    - {id: psec, label: Secrets + KMS, sub: DB credentials, icon: key, at: [1, 2.65], color: green}
+    - {id: sa, label: ECS + ALB, sub: 3 tasks · scales out, icon: [container, loadbalancer], at: [4, 1.45], color: amber}
+    - {id: sdb, label: Aurora secondary, sub: read-only until promoted, icon: [postgresql, database], at: [4, 2.65], color: amber}
+    - {id: ssec, label: Secret replica, sub: same credentials, icon: key, at: [3, 2.65], color: amber}
+  edges:
+    - {from: users, to: cf, kind: data}
+    - {from: cf, to: r53, kind: data}
+    - {from: r53, to: pa, label: PRIMARY, kind: data, at: 0.45}
+    - {from: r53, to: sa, label: SECONDARY on failure, kind: control, at: 0.4}
+    - {from: pa, to: pdb, kind: data, packet: db}
+    - {from: sa, to: sdb, label: reads, kind: data}
+    - {from: psec, to: ssec, label: replicated, kind: secure}
+    - {from: pdb, to: sdb, label: Aurora Global replication · RPO seconds, kind: async, packet: db, via: [[0, 3.3], [4, 3.3]], at: 0.5}
+    - {from: oncall, to: sdb, label: approve, kind: control, at: 0.5}
