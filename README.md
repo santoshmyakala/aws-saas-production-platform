@@ -23,8 +23,6 @@ The full derivation is in [docs/requirements.md](docs/requirements.md).
   <img alt="Failure-domain map: three self-sufficient AZs, each with its own NAT gateway, ECS tasks and Aurora instance; CloudFront and WAF in front of an ALB that only CloudFront can reach; VPC endpoints for AWS APIs; RDS Proxy in front of Aurora; SQS with DLQ; Aurora Global replication to a warm standby region. Cross-AZ egress is blocked by per-AZ routing." src="docs/diagrams/failure-domains-light.svg" width="100%">
 </picture>
 
-<sub>Animated diagrams generated from <a href="docs/diagrams">docs/diagrams/diagrams.yaml</a> with <a href="https://github.com/santoshmyakala/santoshmyakala/tree/main/tools/archdiagram">archdiagram</a>.</sub>
-
 Running in three AZs isn't the same as surviving the loss of one. The design removes the shared pieces that defeat multi-AZ:
 - **One NAT gateway per AZ**, with per-AZ route tables. Production rejects a shared NAT at plan time.
 - **VPC endpoints** for ECR, logs, Secrets Manager, SQS, KMS and STS, so image pulls and secret injection don't depend on NAT.
